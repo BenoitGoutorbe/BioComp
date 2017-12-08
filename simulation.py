@@ -653,7 +653,7 @@ def start_transcribing(INI_file, output_dir):
         #print("Transcript{} : {}".format(i, v))
          
     dic_tr_nbr = dict([[i,v] for i,v in enumerate(tr_nbr)])
-    return(dic_tr_nbr)
+    return(tr_nbr)
     # return (GFF_file, TSS_file, TTS_file,
     #         ITERATIONS_NB, RNAPS_NB,
     #         tr_nbr, tr_times, init_rate,
