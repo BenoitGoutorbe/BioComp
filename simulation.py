@@ -645,6 +645,7 @@ def start_transcribing(INI_file, output_dir):
     print("Simulation completed successfully !! \nNumber of transcripts : \n")
     file = open(os.path.join(output_dir,'res.txt'), 'w+') 
     for i, v in enumerate(tr_nbr):
+        print("Transcript{} : {}".format(i, v))
         file.write("Transcript{} : {}".format(i, v))
         file.write("\n")
         
@@ -1039,6 +1040,7 @@ def resume_transcription(INI_file, resume_path, output_dir):
     print("Simulation completed successfully !! \nNumber of transcripts : \n")
     file = open(os.path.join(output_dir,'res.txt'), 'w+') 
     for i, v in enumerate(tr_nbr):
+        print("Transcript{} : {}".format(i, v))
         file.write("Transcript{} : {}".format(i, v))
         file.write("\n")
     file.close()    
