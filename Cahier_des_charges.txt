@@ -1,0 +1,18 @@
+24-11-17:
+- Première idée pour aller plus loin : faire un algo génétique plutot qu'un simple metropolis
+- La fitness dépend du profil d'expression dans le temps des gènes, ça va necessiter de rentrer dansle code vraiment 
+
+- Rappels : On va intégrer deux modifications : indel, et recombinaison = prendre deux points du génome et inverser --> Le super enroulement qui dépend des promoteurs va donc changer ! 
+
+   -->    <--                                <--      -->                                    -->   -->
+1. |        |  = double inhibition ;     2.    |      |    : double activation          3.   |     |     : inhibition du 2e, activation du 1er.
+
+
+08-12-17
+- Réussir à faire marcher le programme
+- Faire un git avec tout dedans
+- Comprendre les étapes de ce qu'on a à faire.
+
+1. Retrouver le profil d'expression cible pour les 10 gènes : données dans le fichier environment.dat
+2. Définir une fitnes basée sur les paramètres
+3. 
