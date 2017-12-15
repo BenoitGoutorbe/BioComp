@@ -1,9 +1,18 @@
 import simulation as sim
 import os
 import numpy as np
+import random
 
 INI_file = "params.ini" #sys.argv[1]
 output_dir = "output" #sys.argv[2]
+
+config = sim.read_config_file(INI_file)
+TSS_file = config.get('INPUTS','TSS')
+TTS_file = config.get('INPUTS','TTS')
+GFF_file = config.get('INPUTS', 'GFF')
+P_DEL = 0.01
+P_INS = 0.01
+P_INV = 0.01
 
 def fitness (profile, target_profile):
     #difference entre profil et profil cible
@@ -13,9 +22,6 @@ def fitness (profile, target_profile):
 
 def read_positions () :
     #lire les fichiers de tousgenesidentiques
-    config = sim.read_config_file(INI_file)
-    TSS_file = config.get('INPUTS', 'TSS')
-    TTS_file = config.get('INPUTS', 'TTS')
     tss = sim.load_gff(TSS_file)
     tts = sim.load_tab_file(TTS_file)
     pos_start = tss['TSS_pos'].values
@@ -23,13 +29,26 @@ def read_positions () :
     orientation  = sim.str2num(tss['TUorient'].values)
     return [[pos_start[i],pos_end[i], orientation[i]] for i in range(len(pos_start))]
 
-def write_positions () :
+def write_positions (positions) :
     #écrire les fichiers de tousgenesidentiques (TSS, TTS et GFF)
     return []
 
 def mutations (genome) :
     positions = list(genome)
+    gff_df_raw = sim.load_gff(GFF_file)
+    size_genome = int(list(gff_df_raw)[4])
+    codant = []
+    for g in positions :
+        if g[2] > 0 :
+            codant = codant + list(range(g[0],g[1]+1))
+        else :
+            codant = codant + list(range(g[0],g[1]-1, -1))
+    non_codant= [i for i in range(1,size_genome+1) if i not in codant]
+    print(len(codant), len(non_codant), non_codant[0],non_codant[-1])
+
     #inversion
+    if random.random() < P_INS :
+        
 
     #deletion
 
