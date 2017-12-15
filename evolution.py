@@ -5,6 +5,8 @@ import random
 
 INI_file = "params.ini" #sys.argv[1]
 output_dir = "output" #sys.argv[2]
+trial_dir = "essai" #sys.argv[2]
+
 
 config = sim.read_config_file(INI_file)
 TSS_file = config.get('INPUTS','TSS')
@@ -31,8 +33,46 @@ def read_positions () :
     orientation  = sim.str2num(tss['TUorient'].values)
     return [[pos_start[i],pos_end[i], orientation[i]] for i in range(len(pos_start))]
 
-def write_positions (positions) :
-    #écrire les fichiers de tousgenesidentiques (TSS, TTS et GFF)
+def write_positions (positions, size_genome) :
+        #écrire les fichiers de tousgenesidentiques (TSS, TTS et GFF)
+
+    #TTS.dat
+    file = open(os.path.join(trial_dir,'TTS.dat'), 'w+')
+    file.write("TUindex\tTUorient\tTTS_pos\tTTS_proba_off\n")
+    for i, v in enumerate(positions):
+        file.write(str(i)+ "\t")
+        if(v[2] == +1):
+            file.write("+\t")
+        else:
+            file.write("-\t")
+        file.write(str(v[1]) + "\t" + str(1.)+"\n")
+    file.close()
+        
+    #TSS.dat
+    file = open(os.path.join(trial_dir,'TSS.dat'), 'w+')
+    file.write("TUindex\tTUorient\tTSS_pos\tTSS_strength\n")
+    for i, v in enumerate(positions):
+        file.write(str(i)+ "\t")
+        if(v[2] == +1):
+            file.write("+\t")
+        else:
+            file.write("-\t")
+        file.write(str(v[0]) + "\t" + str(.2)+"\n")
+    file.close()
+        
+    #tousgenesidentiques.gff
+    file = open(os.path.join(trial_dir,'tousgenesidentiques.gff'), 'w+')
+    file.write("##gff-version 3\n#!gff-spec-version 1.20\n#!processor NCBI annotwriter\n##sequence-region tousgenesidentiques 1 ")
+    file.write(str(size_genome) + "\n")
+    file.write("tousgenesidentiques\tRefSeq\tregion\t1\t"+ str(size_genome) + "\t.\t+\t.\tID=id0;Name=tousgenesidentiques\n")
+    for i, v in enumerate(positions):
+        file.write("tousgenesidentiques\tRefSeq\tgene\t" + str(v[0]) + "\t" + str(v[1]) + "\t.\t")
+        if(v[2] == +1):
+            file.write("+\t.\tID=g1;Name=g"+str(i+1)+"\n")
+        else:
+            file.write("-\t.\t ID=g1;Name=g"+str(i+1)+"\n")
+    file.close()
+
     return []
 
 def mutations (genome) :
@@ -71,6 +111,7 @@ def mutations (genome) :
                 g[1] = g[1] - SIZE_INDEL
 
     #insertion
+<<<<<<< HEAD
     if random.random() < P_INS:
         position_ins = random.choice(non_codant)
         print('INSERTION', position_ins)
@@ -81,6 +122,11 @@ def mutations (genome) :
                 g[1] = g[1] + SIZE_INDEL
     write_positions(positions)
     return positions
+=======
+
+    write_positions(positions, size_genome)
+    return positions, size_genome
+>>>>>>> 69dc7acb1462199bd051d0947c5033402b2b41b2
 
 def metropolis() :
     envir_file = open(os.path.join('tousgenesidentiques', 'environment.dat'))
@@ -105,4 +151,6 @@ def metropolis() :
         hist_fitness.append(current_fitness)
     return []
 
-metropolis()
+
+
+write_positions(positions, size_genome)
