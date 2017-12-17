@@ -39,18 +39,15 @@ def read_positions () :
     positions_barrieres = prot['prot_pos'].values
     return (positions_genes, positions_barrieres, size_genome)
 
-
-def write_positions (positions_genes, positions_barrieres, size_genome) :
+def write_positions (pos_genes, pos_bar, size_genome) :
     #écrire les fichiers de tousgenesidentiques (TSS, TTS et GFF)
-def write_positions (positions, size_genome, pos_bar) :
-    #écrire les fichiers de tousgenesidentiques (TSS, TTS et GFF)
-    write_TTS(positions)
-    write_TSS(positions)
-    write_tousgenesidentiques(positions, size_genome)
-    write_prot(posbar)
+    write_TTS(pos_genes)
+    write_TSS(pos_genes)
+    write_tousgenesidentiques(pos_genes, size_genome)
+    write_prot(pos_bar)
     return []
 
-def write_TTS(positions) :
+def write_TTS(positions_genes) :
     file = open(os.path.join(trial_dir,'TTS.dat'), 'w+')
     file.write("TUindex\tTUorient\tTTS_pos\tTTS_proba_off\n")
     for i, v in enumerate(positions_genes):
@@ -63,7 +60,7 @@ def write_TTS(positions) :
     file.close()
     return []
         
-def write_TSS(positions) :
+def write_TSS(positions_genes) :
     file = open(os.path.join(trial_dir,'TSS.dat'), 'w+')
     file.write("TUindex\tTUorient\tTSS_pos\tTSS_strength\n")
     for i, v in enumerate(positions_genes):
@@ -77,7 +74,7 @@ def write_TSS(positions) :
     file.close()
     return []
         
-def write_tousgenesidentiques(positions, size_genome) :
+def write_tousgenesidentiques(positions_genes, size_genome) :
     file = open(os.path.join(trial_dir,'tousgenesidentiques.gff'), 'w+')
     file.write("##gff-version 3\n#!gff-spec-version 1.20\n#!processor NCBI annotwriter\n##sequence-region tousgenesidentiques 1 ")
     file.write(str(size_genome) + "\n")
@@ -100,22 +97,17 @@ def write_prot(posbar) :
     file.close()
     return []
 
-def mutations (genome,barrieres_topo, size_genome) :
-    positions_genes = list(genome)
-    positions_barrieres = list(barrieres_topo)
 
-def mutations (genome) :
-    positions = list(genome)
-    gff_df_raw = sim.load_gff(GFF_file)
-    size_genome = int(list(gff_df_raw)[4])
->>>>>>> 6fc238e3b4e0215e137d6f782f4f94ac1a17d161
+def mutations (pos_genes, pos_barrieres, size_genome) :
+    positions_genes= list(pos_genes)
+    positions_barrieres = list(pos_barrieres)
     codant = []
     for g in positions_genes :
         if g[2] > 0 :
             codant = codant + list(range(g[0],g[1]+1))
         else :
             codant = codant + list(range(g[0],g[1]-1, -1))
-    non_codant= [i for i in range(1,size_genome+1) if i not in codant]
+    non_codant = [i for i in range(1,size_genome+1) if i not in codant]
 
     #inversion
     if random.random() < P_INV :
@@ -157,7 +149,7 @@ def mutations (genome) :
         for bar in positions_barrieres:
             if bar > position_ins:
                 bar = bar + SIZE_INDEL
-    #write_positions(positions_genes, positions_barrieres, size_genome)
+    write_positions(positions_genes, positions_barrieres, size_genome)
     return positions_genes, positions_barrieres, size_genome
 
 
