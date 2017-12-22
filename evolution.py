@@ -14,10 +14,34 @@ TSS_file = config.get('INPUTS','TSS')
 TTS_file = config.get('INPUTS','TTS')
 GFF_file = config.get('INPUTS', 'GFF')
 Prot_file = config.get('INPUTS', 'BARR_FIX')
+
+TSS_file_init = config.get('INPUTS','TSS_init')
+TTS_file_init = config.get('INPUTS','TTS_init')
+GFF_file_init = config.get('INPUTS', 'GFF_init')
+Prot_file_init = config.get('INPUTS', 'BARR_FIX_init')
+
 P_DEL = 0.0
 P_INS = 0.0
 P_INV = 1.0
 SIZE_INDEL = 1000
+
+def init_tousgenesidentiques():
+    # reinitialiser tousgenesidentiques
+        #lire les fichiers de tousgenesidentiques_init
+    tss = sim.load_gff(TSS_file_init)
+    tts = sim.load_tab_file(TTS_file_init)
+    pos_start = tss['TSS_pos'].values
+    pos_end = tts['TTS_pos'].values
+    orientation = sim.str2num(tss['TUorient'].values)
+    positions_genes = [[pos_start[i],pos_end[i],orientation[i]] for i in range(len(pos_start))]
+    gff_df_raw = sim.load_gff(GFF_file_init)
+    size_genome = int(list(gff_df_raw)[4])
+    prot = sim.load_tab_file(Prot_file_init)
+    positions_barrieres = prot['prot_pos'].values
+    
+     #écrire les fichiers de tousgenesidentiques (TSS, TTS et GFF)   
+    write_positions(positions_genes, positions_barrieres, size_genome)
+    return []
 
 
 def fitness (profile, target_profile):
@@ -175,5 +199,6 @@ def metropolis() :
         print(current_genome)
         hist_fitness.append(current_fitness)
     return []
-
+    
+init_tousgenesidentiques()
 metropolis()
