@@ -119,9 +119,9 @@ def mutations (pos_genes, pos_barrieres, size_genome) :
                 g[0] = bornes[1] - (g[0] - bornes[0])
                 g[1] = bornes[1] - (g[1] - bornes[0])
                 g[2] = -1.0 * g[2]
-        for bar in positions_barrieres :
-            if bar > bornes[0] and bar < bornes[1]:
-                bar = bornes[1] - (bar - bornes[0])
+        for i in range(len(positions_barrieres)):
+            if positions_barrieres[i] > bornes[0] and positions_barrieres[i] < bornes[1] :
+                positions_barrieres[i] = bornes[1] - (positions_barrieres[i] - bornes[0])
 
     #deletion
     if random.random() < P_DEL:
@@ -134,9 +134,9 @@ def mutations (pos_genes, pos_barrieres, size_genome) :
             if g[0] > position_del and g[1] > position_del:
                 g[0] = g[0] - SIZE_INDEL
                 g[1] = g[1] - SIZE_INDEL
-        for bar in positions_barrieres:
-            if bar > position_del :
-                bar = bar - SIZE_INDEL
+        for i in range(len(positions_barrieres)):
+            if positions_barrieres[i] > position_del :
+                positions_barrieres[i] = positions_barrieres[i] - SIZE_INDEL
     #insertion
     if random.random() < P_INS:
         position_ins = random.choice(non_codant)
@@ -146,9 +146,9 @@ def mutations (pos_genes, pos_barrieres, size_genome) :
             if g[0] > position_ins and g[1] > position_ins:
                 g[0] = g[0] + SIZE_INDEL
                 g[1] = g[1] + SIZE_INDEL
-        for bar in positions_barrieres:
-            if bar > position_ins:
-                bar = bar + SIZE_INDEL
+        for i in range(len(positions_barrieres)):
+            if positions_barrieres[i] > position_ins:
+                positions_barrieres[i] = positions_barrieres[i] + SIZE_INDEL
     write_positions(positions_genes, positions_barrieres, size_genome)
     return positions_genes, positions_barrieres, size_genome
 
