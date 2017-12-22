@@ -7,6 +7,7 @@ INI_file = "params.ini" #sys.argv[1]
 output_dir = "output" #sys.argv[2]
 trial_dir = "tousgenesidentiques" #sys.argv[2]
 
+# commentaire inutile pour un test
 
 config = sim.read_config_file(INI_file)
 TSS_file = config.get('INPUTS','TSS')
