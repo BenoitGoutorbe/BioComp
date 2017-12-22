@@ -2,3 +2,10 @@
 __pycache__/simulation.cpython-36.pyc
 output/res.txt
 tousgenesidentiques/environment.dat
+<<<<<<< HEAD
+=======
+tousgenesidentiques/prot.dat
+tousgenesidentiques/tousgenesidentiques.gff
+tousgenesidentiques/TSS.dat
+tousgenesidentiques/TTS.dat
+>>>>>>> 6310e273f2c17227403b19cac110e3e0842440b2
