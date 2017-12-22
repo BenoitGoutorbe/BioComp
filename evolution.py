@@ -71,7 +71,6 @@ def write_TSS(positions_genes) :
         else:
             file.write("-\t")
         file.write(str(v[0]) + "\t" +".2\n")
-        file.write(str(v[0]) + "\t" + ".2\n")
     file.close()
     return []
         
