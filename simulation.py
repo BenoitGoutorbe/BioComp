@@ -262,7 +262,7 @@ def calc_sigma(Barr_sigma, GYRASE_CONC, k_GYRASE, x0_GYRASE, GYRASE_CTE, TOPO_CO
 ###########################################################
 
 def start_transcribing(INI_file, output_dir):
-
+    print('[TRANSCRIPTION EN COURS]')
     ####################### Params info ###################
     config = read_config_file(INI_file)
 

@@ -2,6 +2,7 @@ import simulation as sim
 import os
 import numpy as np
 import random
+import time
 
 INI_file = "params.ini" #sys.argv[1]
 output_dir = "output" #sys.argv[2]
@@ -22,6 +23,9 @@ P_DEL = 0.0
 P_INS = 0.0
 P_INV = 1.0
 SIZE_INDEL = 1000
+
+TOTAL_TIME = time.time()
+COUNT_TIME = time.time()
 
 # reinitialiser tousgenesidentiques
 def init_tousgenesidentiques():
@@ -128,7 +132,7 @@ def write_prot(posbar) :
 # inversion avec une probabilite P_INV
 # deletion avec une probabilite P_DEL
 # insertion avec une probabilite P_INS
-def mutations (pos_genes, pos_barrieres, size_genome) :
+def mutations(pos_genes, pos_barrieres, size_genome) :
     positions_genes= list(pos_genes)
     positions_barrieres = list(pos_barrieres)
     # detection des sites codants et non codants
@@ -139,22 +143,24 @@ def mutations (pos_genes, pos_barrieres, size_genome) :
         else : # si le gene est dans le sens negatif
             codant = codant + list(range(g[0],g[1]-1, -1))
     non_codant = [i for i in range(1,size_genome+1) if i not in codant]
-
+    
     #inversion
     if random.random() < P_INV :
         # choix de deux bornes dans l'ordre croissant dans le non codant
         bornes = random.sample(non_codant,2)
-        bornes.sort() 
-        print('\n\nINVERSION SUR L\'INTERVALLE', bornes)
+        bornes.sort()
+        print('XX INVERSION SUR L\'INTERVALLE', bornes, " XX")
+        # inversion des genes
         for g in positions_genes :
             if g[0] > bornes[0] and g[1] < bornes[1]:
                 g[0] = bornes[1] - (g[0] - bornes[0])
                 g[1] = bornes[1] - (g[1] - bornes[0])
                 g[2] = -1.0 * g[2]
+        # inversion des barrieres
         for i in range(len(positions_barrieres)):
             if positions_barrieres[i] > bornes[0] and positions_barrieres[i] < bornes[1] :
                 positions_barrieres[i] = bornes[1] - (positions_barrieres[i] - bornes[0])
-
+    
     #deletion
     if random.random() < P_DEL:
         position_del = random.choice(non_codant)
@@ -187,6 +193,8 @@ def mutations (pos_genes, pos_barrieres, size_genome) :
 
 # algorithme Metropolis sur le genome
 def metropolis() :
+    
+    reset_ctime()
     envir_file = open(os.path.join('tousgenesidentiques', 'environment.dat'))
     target_profile = []
     for line in envir_file.readlines():
@@ -198,16 +206,93 @@ def metropolis() :
     transcriptome = np.array(sim.start_transcribing(INI_file, output_dir))
     current_fitness = fitness(transcriptome, target_profile)
     hist_fitness = [current_fitness]
-    print('FITNESS :', current_fitness, '\nEXPRESSION :', transcriptome)
-    print('GENOME :',current_genome)
+    affichage_genome()
+    print('\nEXPRESSION :', transcriptome, '\nFITNESS :', current_fitness)
     for i in range(2) :
         current_genome, current_barrieres, current_size = mutations(current_genome,current_barrieres, current_size)
         transcriptome = np.array(sim.start_transcribing(INI_file,output_dir))
         current_fitness = fitness(transcriptome,target_profile)
-        print('FITNESS :', current_fitness, '\nEXPRESSION :', transcriptome)
-        print('GENOME :',current_genome)
+        affichage_genome()
+        print('\nEXPRESSION :', transcriptome, '\nFITNESS :', current_fitness)
         hist_fitness.append(current_fitness)
     return []
 
+# reinitialise le compteur
+def reset_ctime():
+    COUNT_TIME = time.time()
+    return()
+
+# print le temps du compteur s'il n'y a pas d'argument
+# renvoie le temps du compteur sinon 
+def ctime(ARG = 0):
+    if ARG == 0: 
+        print('.. ',round(time.time() - COUNT_TIME,3),'s ..\n')
+        return()
+    else:
+        return(round(time.time() - COUNT_TIME,3))
+
+
+# print le temps total du programme s'il n'y a pas d'argument
+# renvoie le temps total du compteur sinon 
+def total_time(ARG = 0):
+    if ARG == 0: 
+        print('\n-- ',round(time.time() - TOTAL_TIME,1),' --')
+        return()
+    else:
+        return(round(time.time() - TOTAL_TIME,1))
+
+# afficher le genome de maniere schematique avec les genes et les proteines
+def affichage_genome():
+    GENES = sim.load_gff(GFF_file)
+    PROTS = sim.load_tab_file(Prot_file)
+    
+    barrieres= list(PROTS['prot_pos'])
+    
+    names = list(GENES.loc[:,'ID=id0;Name=tousgenesidentiques'])
+    # reduction des noms pour avoir juste g1, g2, g3, etc.
+    for i in range(len(names)):
+        a = names[i]
+        names[i] = a[11:]
+    sites1 = list(GENES.loc[:,'1'])
+    sites2 = list(GENES.loc[:,'30000'])
+    indices = list(GENES.loc[:,'+'])
+
+    # vecteur de toutes les positions, genes comme proteines
+    allPos = sites1 + barrieres
+    # distinction entre les genes et les proteines
+    length_sites1 = len(sites1)
+    
+    print('\nGENOM:  ', end = '')
+    for i in np.argsort(allPos):
+        # si c'est un gene
+        if i < length_sites1:
+            if indices[i] == "+":
+                print('   |',names[i],'>    ', end = '', sep = '')
+            else:
+                print('   <',names[i],'|    ', end = '', sep = '')
+        # si c'est une proteine
+        else:
+            print('.  ', end = '',sep = '')
+            
+    print('\nGENES:  ', end = '')
+    # print des valeurs des sites
+    for i in np.argsort(allPos):
+        # si c'est un gene
+        if i < length_sites1:
+            if indices[i] == "+":
+                print("|",sites1[i],'-', sites2[i], '>   ', end = '', sep = '')
+            else:
+                print("<",sites2[i],'-', sites1[i], '|   ', end = '', sep = '')
+                
+    print('\nPROTE:  ', end = '')
+    # print des valeurs des proteines
+    for i in np.argsort(allPos):
+        # si c'est une proteine
+        if i >= length_sites1:
+            print('.',barrieres[i - length_sites1],'.         ', end = '',sep = '')
+    print('\n')
+    return()
+
 init_tousgenesidentiques()
 metropolis()
+
