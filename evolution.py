@@ -145,7 +145,7 @@ def mutations (pos_genes, pos_barrieres, size_genome) :
         # choix de deux bornes dans l'ordre croissant dans le non codant
         bornes = random.sample(non_codant,2)
         bornes.sort() 
-        print('INVERSION SUR L\'INTERVALLE', bornes)
+        print('\n\nINVERSION SUR L\'INTERVALLE', bornes)
         for g in positions_genes :
             if g[0] > bornes[0] and g[1] < bornes[1]:
                 g[0] = bornes[1] - (g[0] - bornes[0])
@@ -199,13 +199,13 @@ def metropolis() :
     current_fitness = fitness(transcriptome, target_profile)
     hist_fitness = [current_fitness]
     print('FITNESS :', current_fitness, '\nEXPRESSION :', transcriptome)
-    print('GENOME :\n',current_genome)
+    print('GENOME :',current_genome)
     for i in range(2) :
         current_genome, current_barrieres, current_size = mutations(current_genome,current_barrieres, current_size)
         transcriptome = np.array(sim.start_transcribing(INI_file,output_dir))
         current_fitness = fitness(transcriptome,target_profile)
-        print(current_fitness, transcriptome)
-        print(current_genome)
+        print('FITNESS :', current_fitness, '\nEXPRESSION :', transcriptome)
+        print('GENOME :',current_genome)
         hist_fitness.append(current_fitness)
     return []
 
