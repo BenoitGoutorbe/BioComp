@@ -1,3 +1,11 @@
+'''
+Version 1.0
+
+python3 evolution.py n [nombre d iterations] m [nombre de mesures par iteration]
+
+Le temps sera d'a peu pres n*m*3 secondes
+'''
+
 import simulation as sim
 import os
 import numpy as np
@@ -7,11 +15,21 @@ import random
 import matplotlib.pyplot as plt
 import sys
 
+
+##################
+### PARAMETRES ###
+##################
+
+
 INI_file = "params.ini" #sys.argv[1]
 output_dir = "output" #sys.argv[2]
 
-hyp_dir = "tousgenesidentiques" # dossier qui stocke le prochain pas hypothetique (metropolis)
-old_dir = "tousgenesidentiques_old" # dossier qui stocke la dernière evolution effective de monsieur tousgenesidentiques
+# hyp_dir est le dossier qui stocke le prochain pas hypothetique (metropolis)
+# c'est le dossier que lit le programme pour faire la transcrition, cf le code de Sam
+hyp_dir = "tousgenesidentiques"
+# old_dir est le dossier qui stocke la dernière evolution effective de monsieur tousgenesidentiques
+# utile pour avoir deux versions du genomes et pouvoir revenir un pas en arriere
+old_dir = "tousgenesidentiques_old" 
 
 config = sim.read_config_file(INI_file)
 TSS_file = config.get('INPUTS','TSS')
@@ -34,38 +52,39 @@ P_INS = 0.0
 P_INV = 1.0
 SIZE_INDEL = 1000
 
-TOTAL_TIME = time.time()
-COUNT_TIME = time.time()
+TOTAL_TIME = time.time() # on l'affiche avec total_time()
+COUNT_TIME = time.time() # compteur. On le reset avec reset_ctime() et l'affiche avec ctime()
 
-# reinitialiser tousgenesidentiques
+
+#####################################
+### FONCTIONS ECRITURE ET LECTURE ###
+#####################################
+
+
+# reinitialiser un dossier (hyp_dir ou old_dir) a partir de tousgenesidentiques_init 
 def init_tousgenesidentiques(writing_dir):
-     #lire les fichiers de tousgenesidentiques_init
-    print('REINITIALISATION DU GENOME')
+    print('REINITIALISATION DU DOSSIER', writing_dir)
+    
+    #lire les fichiers de tousgenesidentiques_init
     tss = sim.load_gff(TSS_file_init)
     tts = sim.load_tab_file(TTS_file_init)
+    gff_df_raw = sim.load_gff(GFF_file_init)
+    prot = sim.load_tab_file(Prot_file_init)
+    
     pos_start = tss['TSS_pos'].values
     pos_end = tts['TTS_pos'].values
     orientation = sim.str2num(tss['TUorient'].values)
+    
     positions_genes = [[pos_start[i],pos_end[i],orientation[i]] for i in range(len(pos_start))]
-    gff_df_raw = sim.load_gff(GFF_file_init)
     size_genome = int(list(gff_df_raw)[4])
-    prot = sim.load_tab_file(Prot_file_init)
     positions_barrieres = prot['prot_pos'].values
     
-    #écrire les fichiers de tousgenesidentiques (TSS, TTS et GFF)   
+    #écrire les fichiers (TSS, TTS et GFF)   
     write_positions(positions_genes, positions_barrieres, size_genome,writing_dir)
     return []
 
-# retourne la fitness du profil en le comparant au profil cible
-def fitness (profile, target_profile):
-    # difference entre profil et profil cible
-    dif = profile/np.sum(profile) - target_profile
-    # fitness = 1/distance
-    return 1/np.sum(np.multiply(dif,dif))
-
-
-#lire les fichiers de tousgenesidentiques
-# cette fonction lit dans hyp_dir, soit le dossier tousgenesidentiques
+# lire les fichiers de tousgenesidentiques
+# retourne positions_genes, positions_barrieres, size_genome
 def read_positions (reading_dir) :
     if reading_dir == old_dir:
         tss = sim.load_gff(TSS_file_old)
@@ -77,17 +96,17 @@ def read_positions (reading_dir) :
         tts = sim.load_tab_file(TTS_file)
         gff_df_raw = sim.load_gff(GFF_file)
         prot = sim.load_tab_file(Prot_file)
-        
+    
     pos_start = tss['TSS_pos'].values
     pos_end = tts['TTS_pos'].values
     orientation = sim.str2num(tss['TUorient'].values)
-    positions_genes = [[pos_start[i],pos_end[i],orientation[i]] for i in range(len(pos_start))]
     
+    positions_genes = [[pos_start[i],pos_end[i],orientation[i]] for i in range(len(pos_start))]
     size_genome = int(list(gff_df_raw)[4])
     positions_barrieres = prot['prot_pos'].values
     return (positions_genes, positions_barrieres, size_genome)
 
-#écrire tous les fichiers (TSS, TTS et GFF)
+# écrire tous les fichiers (TSS, TTS et GFF) dans un dossier au choix (hyp_dir ou old_dir)
 def write_positions (pos_genes, pos_bar, size_genome, writing_dir) :
     write_TTS(pos_genes,writing_dir)
     write_TSS(pos_genes,writing_dir)
@@ -149,28 +168,55 @@ def write_prot(posbar, writing_dir) :
     file.close()
     return []
 
+
+##################################
+### FONCTIONS POUR L EVOLUTION ###
+##################################
+
+
+# retourne la fitness du profil en le comparant au profil cible
+def fitness (profile, target_profile):
+    # difference entre profil et profil cible
+    dif = profile/np.sum(profile) - target_profile
+    # fitness = 1/distance
+    return 1/np.sum(np.multiply(dif,dif)) # ou 1-np.sum(np.multiply(dif,dif))
+
+
+# effectue une mesure de fitness m fois
+# renvoie un tableau de taille m    
+def fitness_sample(genome, barrieres, size, target, m):
+    V = []
+    write_positions(genome, barrieres, size, hyp_dir)
+    for i in range(m):
+        transcriptome = np.array(sim.start_transcribing(INI_file, output_dir))
+        V.append(fitness(transcriptome, target))
+    return(V)
+
+
 # effectue une mutation sur le genome
-# inversion avec une probabilite P_INV
-# deletion avec une probabilite P_DEL
-# insertion avec une probabilite P_INS
+# inversion, deletion ou insertion avec des probabilites respectives de P_INV, P_DEL et P_INS
 def mutations(pos_genes, pos_barrieres, size_genome) :
-    positions_genes= list(pos_genes)
+    positions_genes = list(pos_genes)
     positions_barrieres = list(pos_barrieres)
-    # detection des sites codants et non codants
+    # detection des sites codants
     codant = []
     for g in positions_genes :
         if g[2] > 0 : # si le gene est dans le sens positif
             codant = codant + list(range(g[0],g[1]+1))
         else : # si le gene est dans le sens negatif
             codant = codant + list(range(g[0],g[1]-1, -1))
-    non_codant = [i for i in range(1,size_genome+1) if i not in codant]
+    
+    # detection des sites non-codants
+        # ancienne version : non_codant = [i for i in range(1,size_genome+1) if i not in codant]
+    sites = range(1,size_genome+1)
+    non_codant = list(set(sites)- set(codant))    
     
     #inversion
     if random.random() < P_INV :
         # choix de deux bornes dans l'ordre croissant dans le non codant
         bornes = random.sample(non_codant,2)
         bornes.sort()
-        print('\nXX INVERSION SUR L\'INTERVALLE', bornes, " XX")
+        print('\nX INVERSION SUR L\'INTERVALLE', bornes, "X\n")
         # inversion des genes
         for g in positions_genes :
             if g[0] > bornes[0] and g[1] < bornes[1]:
@@ -210,7 +256,7 @@ def mutations(pos_genes, pos_barrieres, size_genome) :
                 positions_barrieres[i] = positions_barrieres[i] + SIZE_INDEL
     return positions_genes, positions_barrieres, size_genome
     
-# aller chercher target profile
+# importe le profil cible du fichier environnement
 def target():
     envir_file = open(os.path.join('tousgenesidentiques', 'environment.dat'))
     target_profile = []
@@ -222,57 +268,110 @@ def target():
 
 # algorithme Metropolis sur le genome
 # n est le nombre d'iteration
-def metropolis(n) :
+# m est le nombre de mesures de fitness par iteration
+def metropolis(n,m) :
     
+    print('\nDebut de simulation. ', n, ' iterations et ', m, 'mesures de fitness par iteration.')
+    print('Temps estime :', n*m*3, 'secondes.\n')
     
-    
-    # initialisation
+    # importation du profil cible
     target_profile = target()
     
-    
+    # lecture du genome initial
     ini_genome, ini_barrieres, ini_size = read_positions(old_dir)
-    write_positions(ini_genome, ini_barrieres, ini_size, hyp_dir)
-    transcriptome = np.array(sim.start_transcribing(INI_file, output_dir))
-    hist_fitness = [fitness(transcriptome, target_profile)]
-    hist_transcriptome = [transcriptome]
     
+    # mesure de la fitness initiale
+    hyp_Vfitness = fitness_sample(ini_genome, ini_barrieres, ini_size, target_profile, m)
+    
+        # ancienne version (une seule mesure par iteration)
+        #~ write_positions(ini_genome, ini_barrieres, ini_size, hyp_dir)
+        #~ ini_transcriptome = np.array(sim.start_transcribing(INI_file, output_dir))
+        #~ ini_fitness = fitness(ini_transcriptome, target_profile)
+    
+    # hist_fitness contiendra les fitness *moyennes* au fur et a mesure de la simulation.
+    # fitness tab contient toutes les m fitness des n iterations. Soit un tableau n * m
+    hist_fitness = [np.mean(hyp_Vfitness)]
+    fitnessTab = [hyp_Vfitness]
     
     affichage_genome(old_dir)
-    affichage_expr(transcriptome)
     affichage_fitness(hist_fitness[-1])
     
+    # ces variables correspondent au genome qui a eu la meilleure fitness moyenne de la simulation
+    best_genome = ini_genome
+    best_barrieres = ini_barrieres
+    best_size = ini_size
+    best_fitness = hist_fitness[-1]
+    
     for i in range(n) :
-        print('\n_ _ _ _ _ ITERATION :', i, ' _ _ _ _ _')
+        print('\n_ _ _ _ _ Iteration :', i+1, 'sur', n)
+        print('_ _ _ _ _', ctime(1), 's')
         
+        # recuperation des dernieres valeurs du genome
         old_genome, old_barrieres, old_size = read_positions(old_dir)
+        # la mutation de ce genome renvoie le prochain genome hypothetique
         hyp_genome, hyp_barrieres, hyp_size = mutations(old_genome, old_barrieres, old_size)
         
-        write_positions(hyp_genome, hyp_barrieres, hyp_size, hyp_dir)
-        hyp_transcriptome = np.array(sim.start_transcribing(INI_file,output_dir))
+            # ancienne version (une seule mesure par iteration)
+            #~ write_positions(hyp_genome, hyp_barrieres, hyp_size, hyp_dir)
+            #~ hyp_transcriptome = np.array(sim.start_transcribing(INI_file,output_dir))
+            #~ hyp_fitness = fitness(hyp_transcriptome,target_profile)
         
-        hyp_fitness = fitness(hyp_transcriptome,target_profile)
-        alpha = hyp_fitness / hist_fitness[-1]
+        # Mesures de m valeurs de fitness
+        hyp_Vfitness = fitness_sample(hyp_genome, hyp_barrieres, hyp_size, target_profile, m)
+        # Fitness moyenne sur les m mesures
+        mean_hyp_Vfitness = np.mean(hyp_Vfitness)
         
-        if alpha >= 1:
-            hist_fitness.append(hyp_fitness)
-            hist_transcriptome.append(hyp_transcriptome)
+        # Comparaison de la fitness moyenne a la fitness precedente
+        alpha = mean_hyp_Vfitness / hist_fitness[-1]
+        
+        affichage_genome(hyp_dir)
+        affichage_fitness(mean_hyp_Vfitness)
+        
+        # alpha > 1 : la fitness a augmente
+        # il y a aussi une chance alpha/10 de garder le genome meme s'il est moins bon
+        if alpha > 1 or random.random() < alpha/10 :
+            
+            fitnessTab.append(hyp_Vfitness)
+            hist_fitness.append(mean_hyp_Vfitness)
+            
+            # le genome hypothetique devient effectif : on l'ecrit dans old_dir
             write_positions(hyp_genome, hyp_barrieres, hyp_size, old_dir)
-        elif random.random() < alpha/10:
-            hist_fitness.append(hyp_fitness)
-            hist_transcriptome.append(hyp_transcriptome)
-            write_positions(hyp_genome, hyp_barrieres, hyp_size, old_dir)
-        
-        affichage_genome(old_dir)
-        affichage_expr(hist_transcriptome[-1])
-        affichage_fitness(hist_fitness[-1])
-        
-        
-    print(hist_transcriptome)
-    plt.plot(hist_fitness)
-    plt.ylabel('Fitness')
-    plt.xlabel('Iteration')
-    plt.show()
+            
+            # si c'est la meilleure fitness moyenne, on garde en stock le genome
+            if mean_hyp_Vfitness > best_fitness :
+                best_genome = hyp_genome
+                best_barrieres = hyp_barrieres
+                best_size = hyp_size
+                best_fitness = mean_hyp_Vfitness
+            
+            if alpha > 1:
+                print('\nAugmentation de la fitness moyenne, mutation retenue')
+            else:
+                print('\nDiminution de la fitness moyenne, mais mutation retenue')
+        else:
+            print('\nDiminution de la fitness moyenne, mutation non retenue')
+    
+    
+    print('\n\n_ _ _ _ _ Le meilleur genome')
+    
+    # ecriture du dernier genome dans le dossier hyp pour pouvoir l'afficher
+    write_positions(best_genome, best_barrieres, best_size, hyp_dir)
+    affichage_genome(hyp_dir)
+    affichage_fitness(best_fitness)
+    
+    
+    print('\nFin de la simulation.\nTemps total :',ctime(1),'s')
+    
+    # plot de la simulation complete
+    affichage_simulation(fitnessTab,hist_fitness)
+    
     return []
+
+
+###############################
+### FONCTIONS POUR LE TEMPS ###
+###############################
+
 
 # reinitialise le compteur
 def reset_ctime():
@@ -282,8 +381,8 @@ def reset_ctime():
 # print le temps du compteur s'il n'y a pas d'argument
 # renvoie le temps du compteur sinon 
 def ctime(ARG = 0):
-    if ARG == 0: 
-        print('.. ',round(time.time() - COUNT_TIME,3),'s ..\n')
+    if ARG == 0:
+        print('..',round(time.time() - COUNT_TIME,3),'s ..')
         return()
     else:
         return(round(time.time() - COUNT_TIME,3))
@@ -297,6 +396,12 @@ def total_time(ARG = 0):
         return()
     else:
         return(round(time.time() - TOTAL_TIME,1))
+
+
+##################################
+### FONCTIONS POUR L AFFICHAGE ###
+##################################
+
 
 # afficher le genome de maniere schematique avec les genes et les proteines
 def affichage_genome(reading_dir):
@@ -351,7 +456,7 @@ def affichage_genome(reading_dir):
         # si c'est une proteine
         if i >= length_sites1:
             print('.',barrieres[i - length_sites1],'.         ', end = '',sep = '')
-    print('\n')
+    print('')
     return()
 
 
@@ -366,17 +471,33 @@ def affichage_fitness(fitness):
     print('\nFITNESS :', fitness)
     return()
 
+
+# affichage du total de la simulation
+def affichage_simulation(fitnessTab,hist_fitness):
+    axes = plt.gca()
+    xL = len(hist_fitness)-1    
+    axes.set_xlim([-0.05*xL,xL*1.05])
+    axes.set_ylim([0,np.max(fitnessTab)*1.05])
+    plt.ylabel('Mesures de fitness et moyenne')
+    plt.xlabel('Iteration')
+    
+    plt.plot(hist_fitness)
+    for i,Vfit in enumerate(fitnessTab) :
+        plt.scatter(np.ones(len(Vfit))*(i),Vfit)
+    
+    print('Plot ouvert dans une nouvelle fenetre. L\'enregistrer avant de fermer la fenetre.')
+    
+    plt.show()
+    return()
+
+
+######################
+### FONCTIONS MAIN ###
+######################
+
+
 init_tousgenesidentiques(hyp_dir)
 init_tousgenesidentiques(old_dir)
-metropolis(400)
-
-#~ affichage_genome(old_dir)
-#~ affichage_genome(hyp_dir)
-#~ transcriptome = np.array(sim.start_transcribing(INI_file, output_dir))
-#~ hist_fitness = [fitness(transcriptome, target_profile)]
-#~ hist_transcriptome = [transcriptome]
+metropolis(int(sys.argv[1]),int(sys.argv[2]))
 
 
-#~ affichage_genome(hyp_dir)
-#~ affichage_expr(transcriptome)
-#~ affichage_fitness(hist_fitness[-1]) 
