@@ -42,7 +42,7 @@ def init_tousgenesidentiques():
     prot = sim.load_tab_file(Prot_file_init)
     positions_barrieres = prot['prot_pos'].values
     
-     #écrire les fichiers de tousgenesidentiques (TSS, TTS et GFF)   
+    #écrire les fichiers de tousgenesidentiques (TSS, TTS et GFF)   
     write_positions(positions_genes, positions_barrieres, size_genome)
     return []
 
@@ -78,6 +78,8 @@ def write_positions (pos_genes, pos_bar, size_genome) :
 
 # ecrire les genes dans TTS
 def write_TTS(positions_genes) :
+    tts = sim.load_tab_file(TTS_file)
+    prob = tts['TTS_proba_off'].values
     file = open(os.path.join(trial_dir,'TTS.dat'), 'w+')
     file.write("TUindex\tTUorient\tTTS_pos\tTTS_proba_off\n")
     for i, v in enumerate(positions_genes):
@@ -86,12 +88,14 @@ def write_TTS(positions_genes) :
             file.write("+\t")
         else:
             file.write("-\t")
-        file.write(str(v[1]) + "\t" + "1.\n")
+        file.write(str(v[1]) + "\t" + str(prob[i]) + "\n")
     file.close()
     return []
 
 # ecrire les genes dans TSS
 def write_TSS(positions_genes) :
+    tss = sim.load_gff(TSS_file)
+    strength = tss['TSS_strength'].values
     file = open(os.path.join(trial_dir,'TSS.dat'), 'w+')
     file.write("TUindex\tTUorient\tTSS_pos\tTSS_strength\n")
     for i, v in enumerate(positions_genes):
@@ -100,7 +104,7 @@ def write_TSS(positions_genes) :
             file.write("+\t")
         else:
             file.write("-\t")
-        file.write(str(v[0]) + "\t" +".2\n")
+        file.write(str(v[0]) + "\t" + str(strength[i]) + "\n")
     file.close()
     return []
 
@@ -133,6 +137,8 @@ def write_prot(posbar) :
 # deletion avec une probabilite P_DEL
 # insertion avec une probabilite P_INS
 def mutations(pos_genes, pos_barrieres, size_genome) :
+    reset_ctime()
+    
     positions_genes= list(pos_genes)
     positions_barrieres = list(pos_barrieres)
     # detection des sites codants et non codants
@@ -149,7 +155,7 @@ def mutations(pos_genes, pos_barrieres, size_genome) :
         # choix de deux bornes dans l'ordre croissant dans le non codant
         bornes = random.sample(non_codant,2)
         bornes.sort()
-        print('XX INVERSION SUR L\'INTERVALLE', bornes, " XX")
+        print('\nXX INVERSION SUR L\'INTERVALLE', bornes, " XX")
         # inversion des genes
         for g in positions_genes :
             if g[0] > bornes[0] and g[1] < bornes[1]:
@@ -189,6 +195,7 @@ def mutations(pos_genes, pos_barrieres, size_genome) :
                 positions_barrieres[i] = positions_barrieres[i] + SIZE_INDEL
     write_positions(positions_genes, positions_barrieres, size_genome)
     return positions_genes, positions_barrieres, size_genome
+    
 
 
 # algorithme Metropolis sur le genome
@@ -207,13 +214,15 @@ def metropolis() :
     current_fitness = fitness(transcriptome, target_profile)
     hist_fitness = [current_fitness]
     affichage_genome()
-    print('\nEXPRESSION :', transcriptome, '\nFITNESS :', current_fitness)
+    affichage_expr(transcriptome)
+    print('\nFITNESS :', current_fitness)
     for i in range(2) :
         current_genome, current_barrieres, current_size = mutations(current_genome,current_barrieres, current_size)
         transcriptome = np.array(sim.start_transcribing(INI_file,output_dir))
         current_fitness = fitness(transcriptome,target_profile)
         affichage_genome()
-        print('\nEXPRESSION :', transcriptome, '\nFITNESS :', current_fitness)
+        affichage_expr(transcriptome)
+        print('\nFITNESS :', current_fitness)
         hist_fitness.append(current_fitness)
     return []
 
@@ -291,6 +300,11 @@ def affichage_genome():
         if i >= length_sites1:
             print('.',barrieres[i - length_sites1],'.         ', end = '',sep = '')
     print('\n')
+    return()
+
+def affichage_expr(transcriptome):
+    print('EXPRESSION : [g1  g2  g3  g4  g5  g6  g7  g8  g9  g10]')
+    print('            ',transcriptome)
     return()
 
 init_tousgenesidentiques()
