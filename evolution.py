@@ -3,10 +3,15 @@ import os
 import numpy as np
 import random
 import time
+import random
+import matplotlib.pyplot as plt
+import sys
 
 INI_file = "params.ini" #sys.argv[1]
 output_dir = "output" #sys.argv[2]
-trial_dir = "tousgenesidentiques" #sys.argv[2]
+
+hyp_dir = "tousgenesidentiques" # dossier qui stocke le prochain pas hypothetique (metropolis)
+old_dir = "tousgenesidentiques_old" # dossier qui stocke la dernière evolution effective de monsieur tousgenesidentiques
 
 config = sim.read_config_file(INI_file)
 TSS_file = config.get('INPUTS','TSS')
@@ -19,6 +24,11 @@ TTS_file_init = config.get('INPUTS','TTS_init')
 GFF_file_init = config.get('INPUTS', 'GFF_init')
 Prot_file_init = config.get('INPUTS', 'BARR_FIX_init')
 
+TSS_file_old = config.get('INPUTS','TSS_old')
+TTS_file_old = config.get('INPUTS','TTS_old')
+GFF_file_old = config.get('INPUTS', 'GFF_old')
+Prot_file_old = config.get('INPUTS', 'BARR_FIX_old')
+
 P_DEL = 0.0
 P_INS = 0.0
 P_INV = 1.0
@@ -28,7 +38,7 @@ TOTAL_TIME = time.time()
 COUNT_TIME = time.time()
 
 # reinitialiser tousgenesidentiques
-def init_tousgenesidentiques():
+def init_tousgenesidentiques(writing_dir):
      #lire les fichiers de tousgenesidentiques_init
     print('REINITIALISATION DU GENOME')
     tss = sim.load_gff(TSS_file_init)
@@ -43,44 +53,51 @@ def init_tousgenesidentiques():
     positions_barrieres = prot['prot_pos'].values
     
     #écrire les fichiers de tousgenesidentiques (TSS, TTS et GFF)   
-    write_positions(positions_genes, positions_barrieres, size_genome)
+    write_positions(positions_genes, positions_barrieres, size_genome,writing_dir)
     return []
 
 # retourne la fitness du profil en le comparant au profil cible
 def fitness (profile, target_profile):
-    #difference entre profil et profil cible
+    # difference entre profil et profil cible
     dif = profile/np.sum(profile) - target_profile
     # fitness = 1/distance
     return 1/np.sum(np.multiply(dif,dif))
 
 
 #lire les fichiers de tousgenesidentiques
-def read_positions () :
-    tss = sim.load_gff(TSS_file)
-    tts = sim.load_tab_file(TTS_file)
+# cette fonction lit dans hyp_dir, soit le dossier tousgenesidentiques
+def read_positions (reading_dir) :
+    if reading_dir == old_dir:
+        tss = sim.load_gff(TSS_file_old)
+        tts = sim.load_tab_file(TTS_file_old)
+        gff_df_raw = sim.load_gff(GFF_file_old)
+        prot = sim.load_tab_file(Prot_file_old)
+    else:
+        tss = sim.load_gff(TSS_file)
+        tts = sim.load_tab_file(TTS_file)
+        gff_df_raw = sim.load_gff(GFF_file)
+        prot = sim.load_tab_file(Prot_file)
+        
     pos_start = tss['TSS_pos'].values
     pos_end = tts['TTS_pos'].values
     orientation = sim.str2num(tss['TUorient'].values)
     positions_genes = [[pos_start[i],pos_end[i],orientation[i]] for i in range(len(pos_start))]
-    gff_df_raw = sim.load_gff(GFF_file)
+    
     size_genome = int(list(gff_df_raw)[4])
-    prot = sim.load_tab_file(Prot_file)
     positions_barrieres = prot['prot_pos'].values
     return (positions_genes, positions_barrieres, size_genome)
 
-#écrire tous les fichiers du dossier tousgenesidentiques (TSS, TTS et GFF)
-def write_positions (pos_genes, pos_bar, size_genome) :
-    write_TTS(pos_genes)
-    write_TSS(pos_genes)
-    write_tousgenesidentiques(pos_genes, size_genome)
-    write_prot(pos_bar)
+#écrire tous les fichiers (TSS, TTS et GFF)
+def write_positions (pos_genes, pos_bar, size_genome, writing_dir) :
+    write_TTS(pos_genes,writing_dir)
+    write_TSS(pos_genes,writing_dir)
+    write_tousgenesidentiques(pos_genes, size_genome,writing_dir)
+    write_prot(pos_bar,writing_dir)
     return []
 
 # ecrire les genes dans TTS
-def write_TTS(positions_genes) :
-    tts = sim.load_tab_file(TTS_file)
-    prob = tts['TTS_proba_off'].values
-    file = open(os.path.join(trial_dir,'TTS.dat'), 'w+')
+def write_TTS(positions_genes, writing_dir) :
+    file = open(os.path.join(writing_dir,'TTS.dat'), 'w+')
     file.write("TUindex\tTUorient\tTTS_pos\tTTS_proba_off\n")
     for i, v in enumerate(positions_genes):
         file.write(str(i)+ "\t")
@@ -88,15 +105,15 @@ def write_TTS(positions_genes) :
             file.write("+\t")
         else:
             file.write("-\t")
-        file.write(str(v[1]) + "\t" + str(prob[i]) + "\n")
+        file.write(str(v[1]) + "\t" + "1.\n")
     file.close()
     return []
 
 # ecrire les genes dans TSS
-def write_TSS(positions_genes) :
+def write_TSS(positions_genes,writing_dir) :
     tss = sim.load_gff(TSS_file)
     strength = tss['TSS_strength'].values
-    file = open(os.path.join(trial_dir,'TSS.dat'), 'w+')
+    file = open(os.path.join(writing_dir,'TSS.dat'), 'w+')
     file.write("TUindex\tTUorient\tTSS_pos\tTSS_strength\n")
     for i, v in enumerate(positions_genes):
         file.write(str(i)+ "\t")
@@ -104,13 +121,13 @@ def write_TSS(positions_genes) :
             file.write("+\t")
         else:
             file.write("-\t")
-        file.write(str(v[0]) + "\t" + str(strength[i]) + "\n")
+        file.write(str(v[0]) + "\t" + str(strength[i])[1:] + "\n")
     file.close()
     return []
 
 # ecrire les genes dans tousgenesidentiques.gff
-def write_tousgenesidentiques(positions_genes, size_genome) :
-    file = open(os.path.join(trial_dir,'tousgenesidentiques.gff'), 'w+')
+def write_tousgenesidentiques(positions_genes, size_genome,writing_dir) :
+    file = open(os.path.join(writing_dir,'tousgenesidentiques.gff'), 'w+')
     file.write("##gff-version 3\n#!gff-spec-version 1.20\n#!processor NCBI annotwriter\n##sequence-region tousgenesidentiques 1 ")
     file.write(str(size_genome) + "\n")
     file.write("tousgenesidentiques\tRefSeq\tregion\t1\t"+ str(size_genome) + "\t.\t+\t.\tID=id0;Name=tousgenesidentiques\n")
@@ -124,8 +141,8 @@ def write_tousgenesidentiques(positions_genes, size_genome) :
     return []
 
 # ecrire les genes dans prot
-def write_prot(posbar) :
-    file = open(os.path.join(trial_dir,'prot.dat'), 'w+')
+def write_prot(posbar, writing_dir) :
+    file = open(os.path.join(writing_dir,'prot.dat'), 'w+')
     file.write("prot_name\tprot_pos\n")
     for i,v in enumerate(posbar):
         file.write("hns\t" + str(v) + "\n")
@@ -137,8 +154,6 @@ def write_prot(posbar) :
 # deletion avec une probabilite P_DEL
 # insertion avec une probabilite P_INS
 def mutations(pos_genes, pos_barrieres, size_genome) :
-    reset_ctime()
-    
     positions_genes= list(pos_genes)
     positions_barrieres = list(pos_barrieres)
     # detection des sites codants et non codants
@@ -193,37 +208,70 @@ def mutations(pos_genes, pos_barrieres, size_genome) :
         for i in range(len(positions_barrieres)):
             if positions_barrieres[i] > position_ins:
                 positions_barrieres[i] = positions_barrieres[i] + SIZE_INDEL
-    write_positions(positions_genes, positions_barrieres, size_genome)
     return positions_genes, positions_barrieres, size_genome
     
-
-
-# algorithme Metropolis sur le genome
-def metropolis() :
-    
-    reset_ctime()
+# aller chercher target profile
+def target():
     envir_file = open(os.path.join('tousgenesidentiques', 'environment.dat'))
     target_profile = []
     for line in envir_file.readlines():
         target_profile.append(float(line.split()[1]))
     target_profile = np.array(target_profile)
     envir_file.close()
-    #simulation :
-    current_genome, current_barrieres, current_size = read_positions()
+    return(target_profile)
+
+# algorithme Metropolis sur le genome
+# n est le nombre d'iteration
+def metropolis(n) :
+    
+    
+    
+    # initialisation
+    target_profile = target()
+    
+    
+    ini_genome, ini_barrieres, ini_size = read_positions(old_dir)
+    write_positions(ini_genome, ini_barrieres, ini_size, hyp_dir)
     transcriptome = np.array(sim.start_transcribing(INI_file, output_dir))
-    current_fitness = fitness(transcriptome, target_profile)
-    hist_fitness = [current_fitness]
-    affichage_genome()
+    hist_fitness = [fitness(transcriptome, target_profile)]
+    hist_transcriptome = [transcriptome]
+    
+    
+    affichage_genome(old_dir)
     affichage_expr(transcriptome)
-    print('\nFITNESS :', current_fitness)
-    for i in range(2) :
-        current_genome, current_barrieres, current_size = mutations(current_genome,current_barrieres, current_size)
-        transcriptome = np.array(sim.start_transcribing(INI_file,output_dir))
-        current_fitness = fitness(transcriptome,target_profile)
-        affichage_genome()
-        affichage_expr(transcriptome)
-        print('\nFITNESS :', current_fitness)
-        hist_fitness.append(current_fitness)
+    affichage_fitness(hist_fitness[-1])
+    
+    for i in range(n) :
+        print('\n_ _ _ _ _ ITERATION :', i, ' _ _ _ _ _')
+        
+        old_genome, old_barrieres, old_size = read_positions(old_dir)
+        hyp_genome, hyp_barrieres, hyp_size = mutations(old_genome, old_barrieres, old_size)
+        
+        write_positions(hyp_genome, hyp_barrieres, hyp_size, hyp_dir)
+        hyp_transcriptome = np.array(sim.start_transcribing(INI_file,output_dir))
+        
+        hyp_fitness = fitness(hyp_transcriptome,target_profile)
+        alpha = hyp_fitness / hist_fitness[-1]
+        
+        if alpha >= 1:
+            hist_fitness.append(hyp_fitness)
+            hist_transcriptome.append(hyp_transcriptome)
+            write_positions(hyp_genome, hyp_barrieres, hyp_size, old_dir)
+        elif random.random() < alpha/10:
+            hist_fitness.append(hyp_fitness)
+            hist_transcriptome.append(hyp_transcriptome)
+            write_positions(hyp_genome, hyp_barrieres, hyp_size, old_dir)
+        
+        affichage_genome(old_dir)
+        affichage_expr(hist_transcriptome[-1])
+        affichage_fitness(hist_fitness[-1])
+        
+        
+    print(hist_transcriptome)
+    plt.plot(hist_fitness)
+    plt.ylabel('Fitness')
+    plt.xlabel('Iteration')
+    plt.show()
     return []
 
 # reinitialise le compteur
@@ -251,9 +299,13 @@ def total_time(ARG = 0):
         return(round(time.time() - TOTAL_TIME,1))
 
 # afficher le genome de maniere schematique avec les genes et les proteines
-def affichage_genome():
-    GENES = sim.load_gff(GFF_file)
-    PROTS = sim.load_tab_file(Prot_file)
+def affichage_genome(reading_dir):
+    if reading_dir == old_dir:
+        GENES = sim.load_gff(GFF_file_old)
+        PROTS = sim.load_tab_file(Prot_file_old)
+    else:
+        GENES = sim.load_gff(GFF_file)
+        PROTS = sim.load_tab_file(Prot_file)
     
     barrieres= list(PROTS['prot_pos'])
     
@@ -302,11 +354,29 @@ def affichage_genome():
     print('\n')
     return()
 
+
+# afficher l'expression
 def affichage_expr(transcriptome):
     print('EXPRESSION : [g1  g2  g3  g4  g5  g6  g7  g8  g9  g10]')
     print('            ',transcriptome)
     return()
 
-init_tousgenesidentiques()
-metropolis()
+# afficher la fitness
+def affichage_fitness(fitness):
+    print('\nFITNESS :', fitness)
+    return()
 
+init_tousgenesidentiques(hyp_dir)
+init_tousgenesidentiques(old_dir)
+metropolis(400)
+
+#~ affichage_genome(old_dir)
+#~ affichage_genome(hyp_dir)
+#~ transcriptome = np.array(sim.start_transcribing(INI_file, output_dir))
+#~ hist_fitness = [fitness(transcriptome, target_profile)]
+#~ hist_transcriptome = [transcriptome]
+
+
+#~ affichage_genome(hyp_dir)
+#~ affichage_expr(transcriptome)
+#~ affichage_fitness(hist_fitness[-1]) 

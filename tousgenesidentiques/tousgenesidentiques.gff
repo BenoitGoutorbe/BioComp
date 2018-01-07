@@ -1,0 +1,15 @@
+##gff-version 3
+#!gff-spec-version 1.20
+#!processor NCBI annotwriter
+##sequence-region tousgenesidentiques 1 30000
+tousgenesidentiques	RefSeq	region	1	30000	.	+	.	ID=id0;Name=tousgenesidentiques
+tousgenesidentiques	RefSeq	gene	25968	24969	.	-	.	ID=g1;Name=g1
+tousgenesidentiques	RefSeq	gene	5676	6675	.	+	.	ID=g1;Name=g2
+tousgenesidentiques	RefSeq	gene	18889	17890	.	-	.	ID=g1;Name=g3
+tousgenesidentiques	RefSeq	gene	2922	3921	.	+	.	ID=g1;Name=g4
+tousgenesidentiques	RefSeq	gene	24138	23139	.	-	.	ID=g1;Name=g5
+tousgenesidentiques	RefSeq	gene	15490	14491	.	-	.	ID=g1;Name=g6
+tousgenesidentiques	RefSeq	gene	27463	26464	.	-	.	ID=g1;Name=g7
+tousgenesidentiques	RefSeq	gene	15724	16723	.	+	.	ID=g1;Name=g8
+tousgenesidentiques	RefSeq	gene	29460	28461	.	-	.	ID=g1;Name=g9
+tousgenesidentiques	RefSeq	gene	11404	10405	.	-	.	ID=g1;Name=g10
