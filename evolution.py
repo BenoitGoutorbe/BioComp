@@ -179,7 +179,7 @@ def fitness (profile, target_profile):
     # difference entre profil et profil cible
     dif = profile/np.sum(profile) - target_profile
     # fitness = 1/distance
-    return 1/np.sum(np.multiply(dif,dif)) # ou 1-np.sum(np.multiply(dif,dif))
+    return np.exp(-np.sum(np.multiply(dif,dif)))
 
 
 # effectue une mesure de fitness m fois
