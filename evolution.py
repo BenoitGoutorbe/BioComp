@@ -47,9 +47,9 @@ TTS_file_old = config.get('INPUTS','TTS_old')
 GFF_file_old = config.get('INPUTS', 'GFF_old')
 Prot_file_old = config.get('INPUTS', 'BARR_FIX_old')
 
-P_DEL = 0.2
-P_INS = 0.8
-P_INV = 0
+P_INV = 0.5
+P_DEL = 0.25
+P_INS = 0.25
 SIZE_INDEL = 500
 
 TOTAL_TIME = time.time() # on l'affiche avec total_time()
@@ -212,10 +212,10 @@ def mutations(pos_genes, pos_barrieres, size_genome) :
     non_codant = list(set(sites)- set(codant))    
     
     # choix aleatoire du type de mutation selon P_INV, P_DEL, P_INS
-    type_mutation = random.random()
-    
+    p = random.random()
     # inversion
-    if 0 <= type_mutation and type_mutation < P_INV :
+    if 0 <= p and p < P_INV :
+        type_mut = "INV"
         # choix de deux bornes dans l'ordre croissant dans le non codant
         bornes = random.sample(non_codant,2)
         bornes.sort()
@@ -232,7 +232,8 @@ def mutations(pos_genes, pos_barrieres, size_genome) :
                 positions_barrieres[i] = bornes[1] - (positions_barrieres[i] - bornes[0])
     
     # deletion
-    if P_INV <= type_mutation and type_mutation < P_INV + P_DEL:
+    if P_INV <= p and p < P_INV + P_DEL:
+        type_mut = "DEL"
         # choix d'un site de taille SIZE_INDEL a retirer, qui ne soit pas en zone codante
         # au bout de 1000 essais au compteur, on arrete d essayer
         compteur = 1
@@ -265,7 +266,8 @@ def mutations(pos_genes, pos_barrieres, size_genome) :
             print('\nPas de deletion possible car aucune region de taille',SIZE_INDEL,' n\'a été trouvée.')
     
     # insertion
-    if P_INV + P_DEL <= type_mutation and type_mutation < P_INV + P_DEL + P_INS:
+    if P_INV + P_DEL <= p and p < P_INV + P_DEL + P_INS:
+        type_mut = "INS"
         # choix d'un site pour l insertion
         position_ins = random.choice(non_codant)
         print('\n[+] INSERTION DE', SIZE_INDEL, 'SITES EN POSITION', position_ins,'[+]\n')
@@ -279,7 +281,7 @@ def mutations(pos_genes, pos_barrieres, size_genome) :
         for i in range(len(positions_barrieres)):
             if positions_barrieres[i] > position_ins:
                 positions_barrieres[i] = positions_barrieres[i] + SIZE_INDEL
-    return positions_genes, positions_barrieres, size_genome
+    return positions_genes, positions_barrieres, size_genome , type_mut
     
 # importe le profil cible du fichier environnement
 def target():
@@ -327,6 +329,14 @@ def metropolis(n,m) :
     best_size = ini_size
     best_fitness = hist_fitness[-1]
     
+    # Comptage des succes de chaque type de mutation
+    MUT_NUM = np.zeros((1,3))
+    MUT_SUCCESS = np.zeros((1,3))
+    DICO = dict()
+    DICO["INV"] = 0
+    DICO["DEL"] = 1
+    DICO["INS"] = 2
+    
     for i in range(n) :
         print('\n_ _ _ _ _ Iteration :', i+1, 'sur', n)
         print('_ _ _ _ _', ctime(1), 's')
@@ -334,7 +344,7 @@ def metropolis(n,m) :
         # recuperation des dernieres valeurs du genome
         old_genome, old_barrieres, old_size = read_positions(old_dir)
         # la mutation de ce genome renvoie le prochain genome hypothetique
-        hyp_genome, hyp_barrieres, hyp_size = mutations(old_genome, old_barrieres, old_size)
+        hyp_genome, hyp_barrieres, hyp_size, type_mut = mutations(old_genome, old_barrieres, old_size)
         
             # ancienne version (une seule mesure par iteration)
             #~ write_positions(hyp_genome, hyp_barrieres, hyp_size, hyp_dir)
@@ -343,6 +353,7 @@ def metropolis(n,m) :
         
         # Mesures de m valeurs de fitness
         hyp_Vfitness = fitness_sample(hyp_genome, hyp_barrieres, hyp_size, target_profile, m)
+        MUT_NUM[0,DICO[type_mut]] += 1
         # Fitness moyenne sur les m mesures
         mean_hyp_Vfitness = np.mean(hyp_Vfitness)
         
@@ -371,6 +382,7 @@ def metropolis(n,m) :
             
             if alpha > 1:
                 print('\nAugmentation de la fitness moyenne, mutation retenue')
+                MUT_SUCCESS[0,DICO[type_mut]] = 1
             else:
                 print('\nDiminution de la fitness moyenne, mais mutation retenue')
         else:
@@ -379,11 +391,15 @@ def metropolis(n,m) :
     
     print('\n\n_ _ _ _ _ Le meilleur genome')
     
-    # ecriture du dernier genome dans le dossier hyp pour pouvoir l'afficher
+    # ecriture du best genome dans le dossier hyp afin de l'afficher
     write_positions(best_genome, best_barrieres, best_size, hyp_dir)
     affichage_genome(hyp_dir)
     affichage_fitness(best_fitness)
     
+    print('\n Nombre de INV, DEL et INS et pourcentages de succes respectifs :')
+    RES = MUT_SUCCESS/MUT_NUM
+    print(MUT_NUM[0,:])    
+    print(RES[0,:])    
     
     print('\nFin de la simulation.\nTemps total :',ctime(1),'s')
     
