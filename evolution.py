@@ -47,10 +47,10 @@ TTS_file_old = config.get('INPUTS','TTS_old')
 GFF_file_old = config.get('INPUTS', 'GFF_old')
 Prot_file_old = config.get('INPUTS', 'BARR_FIX_old')
 
-P_DEL = 0.0
-P_INS = 0.0
-P_INV = 1.0
-SIZE_INDEL = 1000
+P_DEL = 0.2
+P_INS = 0.8
+P_INV = 0
+SIZE_INDEL = 500
 
 TOTAL_TIME = time.time() # on l'affiche avec total_time()
 COUNT_TIME = time.time() # compteur. On le reset avec reset_ctime() et l'affiche avec ctime()
@@ -211,12 +211,15 @@ def mutations(pos_genes, pos_barrieres, size_genome) :
     sites = range(1,size_genome+1)
     non_codant = list(set(sites)- set(codant))    
     
-    #inversion
-    if random.random() < P_INV :
+    # choix aleatoire du type de mutation selon P_INV, P_DEL, P_INS
+    type_mutation = random.random()
+    
+    # inversion
+    if 0 <= type_mutation and type_mutation < P_INV :
         # choix de deux bornes dans l'ordre croissant dans le non codant
         bornes = random.sample(non_codant,2)
         bornes.sort()
-        print('\nX INVERSION SUR L\'INTERVALLE', bornes, "X\n")
+        print('\n[x] INVERSION SUR L\'INTERVALLE', bornes, "[x]\n")
         # inversion des genes
         for g in positions_genes :
             if g[0] > bornes[0] and g[1] < bornes[1]:
@@ -228,29 +231,51 @@ def mutations(pos_genes, pos_barrieres, size_genome) :
             if positions_barrieres[i] > bornes[0] and positions_barrieres[i] < bornes[1] :
                 positions_barrieres[i] = bornes[1] - (positions_barrieres[i] - bornes[0])
     
-    #deletion
-    if random.random() < P_DEL:
-        position_del = random.choice(non_codant)
-        while position_del+SIZE_INDEL in codant :
+    # deletion
+    if P_INV <= type_mutation and type_mutation < P_INV + P_DEL:
+        # choix d'un site de taille SIZE_INDEL a retirer, qui ne soit pas en zone codante
+        # au bout de 1000 essais au compteur, on arrete d essayer
+        compteur = 1
+        CORRECT_DEL = False
+        while CORRECT_DEL == False and compteur <= 1000 :
+            CORRECT_DEL = True
             position_del = random.choice(non_codant)
-        print('DELETION', position_del)
-        size_genome = size_genome - SIZE_INDEL
-        for g in positions_genes:
-            if g[0] > position_del and g[1] > position_del:
-                g[0] = g[0] - SIZE_INDEL
-                g[1] = g[1] - SIZE_INDEL
-        for i in range(len(positions_barrieres)):
-            if positions_barrieres[i] > position_del :
-                positions_barrieres[i] = positions_barrieres[i] - SIZE_INDEL
-    #insertion
-    if random.random() < P_INS:
+            # prise en compte des genes
+            if(position_del + SIZE_INDEL in codant):
+                CORRECT_DEL = False
+            # prise en compte des barrieres
+            for bar in positions_barrieres:
+                if position_del <= bar and bar <= position_del + SIZE_INDEL:
+                    CORRECT_DEL = False
+            
+            compteur += 1
+        
+        if compteur <= 1000:
+            print('\n[-] DELETION DE',SIZE_INDEL,'SITES DE', position_del, 'A', position_del + SIZE_INDEL,'[-]\n')
+            size_genome = size_genome - SIZE_INDEL
+            for g in positions_genes:
+                if g[0] > position_del and g[1] > position_del:
+                    g[0] = g[0] - SIZE_INDEL
+                    g[1] = g[1] - SIZE_INDEL
+            
+            for i in range(len(positions_barrieres)):
+                if positions_barrieres[i] > position_del :
+                    positions_barrieres[i] = positions_barrieres[i] - SIZE_INDEL
+        else:
+            print('\nPas de deletion possible car aucune region de taille',SIZE_INDEL,' n\'a été trouvée.')
+    
+    # insertion
+    if P_INV + P_DEL <= type_mutation and type_mutation < P_INV + P_DEL + P_INS:
+        # choix d'un site pour l insertion
         position_ins = random.choice(non_codant)
-        print('INSERTION', position_ins)
+        print('\n[+] INSERTION DE', SIZE_INDEL, 'SITES EN POSITION', position_ins,'[+]\n')
         size_genome = size_genome + SIZE_INDEL
         for g in positions_genes:
             if g[0] > position_ins and g[1] > position_ins:
                 g[0] = g[0] + SIZE_INDEL
                 g[1] = g[1] + SIZE_INDEL
+        
+        print(len(positions_barrieres))
         for i in range(len(positions_barrieres)):
             if positions_barrieres[i] > position_ins:
                 positions_barrieres[i] = positions_barrieres[i] + SIZE_INDEL
@@ -412,6 +437,7 @@ def affichage_genome(reading_dir):
         GENES = sim.load_gff(GFF_file)
         PROTS = sim.load_tab_file(Prot_file)
     
+    
     barrieres= list(PROTS['prot_pos'])
     
     names = list(GENES.loc[:,'ID=id0;Name=tousgenesidentiques'])
@@ -420,9 +446,10 @@ def affichage_genome(reading_dir):
         a = names[i]
         names[i] = a[11:]
     sites1 = list(GENES.loc[:,'1'])
-    sites2 = list(GENES.loc[:,'30000'])
+    gSIZE = GENES.axes[1][4]
+    sites2 = list(GENES.loc[:,gSIZE])
     indices = list(GENES.loc[:,'+'])
-
+    
     # vecteur de toutes les positions, genes comme proteines
     allPos = sites1 + barrieres
     # distinction entre les genes et les proteines
