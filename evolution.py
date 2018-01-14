@@ -50,11 +50,20 @@ Prot_file_old = config.get('INPUTS', 'BARR_FIX_old')
 P_INV = 0.5
 P_DEL = 0.25
 P_INS = 0.25
+
 SIZE_INDEL = 500
 
 TOTAL_TIME = time.time() # on l'affiche avec total_time()
 COUNT_TIME = time.time() # compteur. On le reset avec reset_ctime() et l'affiche avec ctime()
 
+SIMUL_NAME = time.strftime("J%d_%Hh_%Mmn")
+
+# ligne pour la sauvegarde des infos dans des fichiers .txt
+result_dir = "output_" + SIMUL_NAME
+os.mkdir(result_dir)
+
+file_fit = open(os.path.join(result_dir,'HIST_fitness.txt'), 'w+')
+file_console = open(os.path.join(result_dir,'HIST_console.txt'), 'w+')
 
 #####################################
 ### FONCTIONS ECRITURE ET LECTURE ###
@@ -63,7 +72,7 @@ COUNT_TIME = time.time() # compteur. On le reset avec reset_ctime() et l'affiche
 
 # reinitialiser un dossier (hyp_dir ou old_dir) a partir de tousgenesidentiques_init 
 def init_tousgenesidentiques(writing_dir):
-    print('REINITIALISATION DU DOSSIER', writing_dir)
+    print_save(str('REINITIALISATION DU DOSSIER '+ writing_dir), file_console )
     
     #lire les fichiers de tousgenesidentiques_init
     tss = sim.load_gff(TSS_file_init)
@@ -179,8 +188,9 @@ def fitness (profile, target_profile):
     # difference entre profil et profil cible
     dif = profile/np.sum(profile) - target_profile
     # fitness = 1/distance
-    return np.exp(-np.sum(np.multiply(dif,dif)))
-
+    #return np.exp(-np.sum(np.multiply(dif,dif)))
+    pente = 10 # une pente de 10 permet d'avoir une fitness qui se repartit generalement entre 0 et 1
+    return 2 / (1 + np.exp( pente * np.sqrt( np.sum( np.multiply(dif,dif) ) ) ) )
 
 # effectue une mesure de fitness m fois
 # renvoie un tableau de taille m    
@@ -219,7 +229,7 @@ def mutations(pos_genes, pos_barrieres, size_genome) :
         # choix de deux bornes dans l'ordre croissant dans le non codant
         bornes = random.sample(non_codant,2)
         bornes.sort()
-        print('\n[x] INVERSION SUR L\'INTERVALLE', bornes, "[x]\n")
+        print_save(str('\n[x] INVERSION SUR L\'INTERVALLE '+ str(bornes) + " [x]\n"), file_console )
         # inversion des genes
         for g in positions_genes :
             if g[0] > bornes[0] and g[1] < bornes[1]:
@@ -252,7 +262,7 @@ def mutations(pos_genes, pos_barrieres, size_genome) :
             compteur += 1
         
         if compteur <= 1000:
-            print('\n[-] DELETION DE',SIZE_INDEL,'SITES DE', position_del, 'A', position_del + SIZE_INDEL,'[-]\n')
+            print_save('\n[-] DELETION DE ' + str(SIZE_INDEL) + ' SITES DE ' + str(position_del) + ' A ' + str(position_del + SIZE_INDEL) +' [-]\n', file_console )
             size_genome = size_genome - SIZE_INDEL
             for g in positions_genes:
                 if g[0] > position_del and g[1] > position_del:
@@ -263,21 +273,21 @@ def mutations(pos_genes, pos_barrieres, size_genome) :
                 if positions_barrieres[i] > position_del :
                     positions_barrieres[i] = positions_barrieres[i] - SIZE_INDEL
         else:
-            print('\nPas de deletion possible car aucune region de taille',SIZE_INDEL,' n\'a été trouvée.')
+            print_save('\nPas de deletion possible car aucune region de taille ' + str(SIZE_INDEL) + ' n\'a été trouvée.', file_console )
     
     # insertion
     if P_INV + P_DEL <= p and p < P_INV + P_DEL + P_INS:
         type_mut = "INS"
         # choix d'un site pour l insertion
         position_ins = random.choice(non_codant)
-        print('\n[+] INSERTION DE', SIZE_INDEL, 'SITES EN POSITION', position_ins,'[+]\n')
+        print_save('\n[+] INSERTION DE ' + str(SIZE_INDEL) + ' SITES EN POSITION ' + str(position_ins) + ' [+]\n', file_console )
         size_genome = size_genome + SIZE_INDEL
         for g in positions_genes:
             if g[0] > position_ins and g[1] > position_ins:
                 g[0] = g[0] + SIZE_INDEL
                 g[1] = g[1] + SIZE_INDEL
         
-        print(len(positions_barrieres))
+        
         for i in range(len(positions_barrieres)):
             if positions_barrieres[i] > position_ins:
                 positions_barrieres[i] = positions_barrieres[i] + SIZE_INDEL
@@ -293,13 +303,31 @@ def target():
     envir_file.close()
     return(target_profile)
 
+def print_save(str1, file1 = 0):
+    if file1 != 0:
+        file1.write(str1 + "\n")
+    print(str1)
+    
+    return()
 # algorithme Metropolis sur le genome
 # n est le nombre d'iteration
 # m est le nombre de mesures de fitness par iteration
 def metropolis(n,m) :
     
-    print('\nDebut de simulation. ', n, ' iterations et ', m, 'mesures de fitness par iteration.')
-    print('Temps estime :', n*m*3, 'secondes.\n')
+    # initialisation des fichiers d ecriture
+    file_fit.write("id")
+    for i in range(m):
+        file_fit.write("\tfit" + str(i))
+        
+    file_fit.write("\tmeanFit\tret\n")
+
+    
+    print_save('\nDebut de simulation. ' + str(n) + ' iterations et ' + str(m) + ' mesures de fitness par iteration.', file_console)
+    print_save('Temps estime : ' + str(n*m*3) + ' secondes.\n', file_console)
+    
+    
+    
+    
     
     # importation du profil cible
     target_profile = target()
@@ -338,8 +366,11 @@ def metropolis(n,m) :
     DICO["INS"] = 2
     
     for i in range(n) :
-        print('\n_ _ _ _ _ Iteration :', i+1, 'sur', n)
-        print('_ _ _ _ _', ctime(1), 's')
+        # print de l'id
+        file_fit.write(str(i+1))
+        
+        print_save('\n_ _ _ _ _ Iteration : ' + str(i+1) + ' sur ' + str(n), file_console)
+        print_save('_ _ _ _ _' + str(ctime(1)) + ' s ', file_console)
         
         # recuperation des dernieres valeurs du genome
         old_genome, old_barrieres, old_size = read_positions(old_dir)
@@ -353,9 +384,16 @@ def metropolis(n,m) :
         
         # Mesures de m valeurs de fitness
         hyp_Vfitness = fitness_sample(hyp_genome, hyp_barrieres, hyp_size, target_profile, m)
+        
+        for fit in hyp_Vfitness:
+            file_fit.write("\t" + str(fit))
+        
         MUT_NUM[0,DICO[type_mut]] += 1
         # Fitness moyenne sur les m mesures
         mean_hyp_Vfitness = np.mean(hyp_Vfitness)
+        
+        # ecriture de la fitness moyenne
+        file_fit.write("\t" + str(mean_hyp_Vfitness))
         
         # Comparaison de la fitness moyenne a la fitness precedente
         alpha = mean_hyp_Vfitness / hist_fitness[-1]
@@ -381,27 +419,30 @@ def metropolis(n,m) :
                 best_fitness = mean_hyp_Vfitness
             
             if alpha > 1:
-                print('\nAugmentation de la fitness moyenne, mutation retenue')
+                print_save('\nAugmentation de la fitness moyenne, mutation retenue', file_console)
                 MUT_SUCCESS[0,DICO[type_mut]] = 1
+                file_fit.write('\t2\n')
             else:
-                print('\nDiminution de la fitness moyenne, mais mutation retenue')
+                print_save('\nDiminution de la fitness moyenne, mais mutation retenue', file_console)
+                file_fit.write('\t1\n')
         else:
-            print('\nDiminution de la fitness moyenne, mutation non retenue')
+            print_save('\nDiminution de la fitness moyenne, mutation non retenue', file_console)
+            file_fit.write('\t0\n')
     
     
-    print('\n\n_ _ _ _ _ Le meilleur genome')
+    print_save('\n\n_ _ _ _ _ Le meilleur genome', file_console )
     
     # ecriture du best genome dans le dossier hyp afin de l'afficher
     write_positions(best_genome, best_barrieres, best_size, hyp_dir)
     affichage_genome(hyp_dir)
     affichage_fitness(best_fitness)
     
-    print('\n Nombre de INV, DEL et INS et pourcentages de succes respectifs :')
+    print_save('\n Nombre de INV, DEL et INS et pourcentages de succes respectifs :', file_console )
     RES = MUT_SUCCESS/MUT_NUM
-    print(MUT_NUM[0,:])    
-    print(RES[0,:])    
+    print_save(str(MUT_NUM[0,:]), file_console )     
+    print_save(str(RES[0,:]), file_console )    
     
-    print('\nFin de la simulation.\nTemps total :',ctime(1),'s')
+    print_save('\nFin de la simulation.\nTemps total : ' + str(ctime(1)) + ' s', file_console )
     
     # plot de la simulation complete
     affichage_simulation(fitnessTab,hist_fitness)
@@ -423,7 +464,7 @@ def reset_ctime():
 # renvoie le temps du compteur sinon 
 def ctime(ARG = 0):
     if ARG == 0:
-        print('..',round(time.time() - COUNT_TIME,3),'s ..')
+        print_save('.. ' + str(round(time.time() - COUNT_TIME,3) ) + ' s ..', file_console )
         return()
     else:
         return(round(time.time() - COUNT_TIME,3))
@@ -433,7 +474,7 @@ def ctime(ARG = 0):
 # renvoie le temps total du compteur sinon 
 def total_time(ARG = 0):
     if ARG == 0: 
-        print('\n-- ',round(time.time() - TOTAL_TIME,1),' --')
+        print_save('\n-- ' + str(round(time.time() - TOTAL_TIME,1) )  + ' --', file_console )
         return()
     else:
         return(round(time.time() - TOTAL_TIME,1))
@@ -471,47 +512,51 @@ def affichage_genome(reading_dir):
     # distinction entre les genes et les proteines
     length_sites1 = len(sites1)
     
-    print('\nGENOM:  ', end = '')
+    STRING_GENOM = '\nGENOM:  '
     for i in np.argsort(allPos):
         # si c'est un gene
         if i < length_sites1:
             if indices[i] == "+":
-                print('   |',names[i],'>    ', end = '', sep = '')
+                STRING_GENOM += '   |' + str(names[i]) + '>    '
             else:
-                print('   <',names[i],'|    ', end = '', sep = '')
+                STRING_GENOM += '   <' + str(names[i]) + '|    '
         # si c'est une proteine
         else:
-            print('.  ', end = '',sep = '')
-            
-    print('\nGENES:  ', end = '')
+            STRING_GENOM += '.  '
+    print_save(STRING_GENOM, file_console)
+    
+    STRING_GENES = 'GENES:  '
     # print des valeurs des sites
     for i in np.argsort(allPos):
         # si c'est un gene
         if i < length_sites1:
             if indices[i] == "+":
-                print("|",sites1[i],'-', sites2[i], '>   ', end = '', sep = '')
+                STRING_GENES += "|" + str(sites1[i]) + '-' + str(sites2[i]) + '>   '
             else:
-                print("<",sites2[i],'-', sites1[i], '|   ', end = '', sep = '')
-                
-    print('\nPROTE:  ', end = '')
+                STRING_GENES += "<" + str(sites2[i]) + '-' + str(sites1[i]) + '|   '
+    print_save(STRING_GENES, file_console)
+    
+    STRING_PROTE = 'PROTE:  '
     # print des valeurs des proteines
     for i in np.argsort(allPos):
         # si c'est une proteine
         if i >= length_sites1:
-            print('.',barrieres[i - length_sites1],'.         ', end = '',sep = '')
-    print('')
+            STRING_PROTE += '.' + str(barrieres[i - length_sites1]) + '.         '
+    print_save(STRING_PROTE, file_console)
+    
+    print_save('', file_console)
     return()
 
 
 # afficher l'expression
 def affichage_expr(transcriptome):
-    print('EXPRESSION : [g1  g2  g3  g4  g5  g6  g7  g8  g9  g10]')
-    print('            ',transcriptome)
+    print_save('EXPRESSION : [g1  g2  g3  g4  g5  g6  g7  g8  g9  g10]', file_console )
+    print_save('             ' + str(transcriptome), file_console )
     return()
 
 # afficher la fitness
 def affichage_fitness(fitness):
-    print('\nFITNESS :', fitness)
+    print_save('\nFITNESS : ' + str(fitness), file_console )
     return()
 
 
@@ -519,17 +564,19 @@ def affichage_fitness(fitness):
 def affichage_simulation(fitnessTab,hist_fitness):
     axes = plt.gca()
     xL = len(hist_fitness)-1    
-    axes.set_xlim([-0.05*xL,xL*1.05])
+    axes.set_xlim([-0.05*xL,xL*1.05])   
     axes.set_ylim([0,np.max(fitnessTab)*1.05])
     plt.ylabel('Mesures de fitness et moyenne')
     plt.xlabel('Iteration')
-    
+    plt.title('Evolution de la fitness')
     plt.plot(hist_fitness)
+    
     for i,Vfit in enumerate(fitnessTab) :
         plt.scatter(np.ones(len(Vfit))*(i),Vfit)
     
-    print('Plot ouvert dans une nouvelle fenetre. L\'enregistrer avant de fermer la fenetre.')
+    print_save('Graphe ouvert dans une nouvelle fenetre et enregistré avec les résultats en ' + str(result_dir) + ".", file_console )
     
+    plt.savefig(result_dir + '/GRAPHE_' + time.strftime("J%d_%Hh_%Mmn") + ".png")
     plt.show()
     return()
 
@@ -544,3 +591,5 @@ init_tousgenesidentiques(old_dir)
 metropolis(int(sys.argv[1]),int(sys.argv[2]))
 
 
+file_fit.close()
+file_console.close()
